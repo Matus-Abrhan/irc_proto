@@ -1,3 +1,6 @@
+use bytes::{BufMut, BytesMut};
+use crate::message::Write;
+
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
 pub enum Numeric {
@@ -81,32 +84,32 @@ impl Numeric {
 
     }
 
-    pub fn params(self) -> Vec<String> {
+    pub fn params(&self) -> Vec<String> {
         use Numeric::*;
 
         match self {
-            RPL_ENDOFWHO{client, mask} => vec![client, mask],
-            RPL_WHOREPLY{client, channel, username, host, server, nick, flags, hopcount, realname} => vec![client, channel, username, host, server, nick, flags, hopcount, realname],
+            RPL_ENDOFWHO{client, mask} => vec![client.to_string(), mask.to_string()],
+            // RPL_WHOREPLY{client, channel, username, host, server, nick, flags, hopcount, realname} => vec![client, channel, username, host, server, nick, flags, hopcount, realname],
             // RPL_NAMREPLY{client, symbol, channel, members} => vec![client, symbol, channel, members],
-            RPL_ENDOFNAMES{client, channel} => vec![client, channel],
-            RPL_MOTD{client, line} => vec![client, line],
-            RPL_MOTDSTART{client, line} => vec![client, line],
-            RPL_ENDOFMOTD{client} => vec![client],
+            RPL_ENDOFNAMES{client, channel} => vec![client.to_string(), channel.to_string()],
+            RPL_MOTD{client, line} => vec![client.to_string(), line.to_string()],
+            RPL_MOTDSTART{client, line} => vec![client.to_string(), line.to_string()],
+            RPL_ENDOFMOTD{client} => vec![client.to_string()],
 
-            ERR_NOTEXTTOSEND{client} => vec![client],
-            ERR_NONICKNAMEGIVEN{client} => vec![client],
-            ERR_ERRONEUSNICKNAME{client, nick} => vec![client, nick],
-            ERR_NICKNAMEINUSE{client, nick} => vec![client, nick],
-            ERR_NICKCOLLISION{client, nick, user, host} => vec![client, nick, user, host],
-            ERR_NEEDMOREPARAMS{client, command} => vec![client, command],
-            ERR_ALREADYREGISTERED{client} => vec![client],
-            ERR_PASSWDMISMATCH{client} => vec![client],
+            ERR_NOTEXTTOSEND{client} => vec![client.to_string()],
+            ERR_NONICKNAMEGIVEN{client} => vec![client.to_string()],
+            ERR_ERRONEUSNICKNAME{client, nick} => vec![client.to_string(), nick.to_string()],
+            ERR_NICKNAMEINUSE{client, nick} => vec![client.to_string(), nick.to_string()],
+            ERR_NICKCOLLISION{client, nick, user, host} => vec![client.to_string(), nick.to_string(), user.to_string(), host.to_string()],
+            ERR_NEEDMOREPARAMS{client, command} => vec![client.to_string(), command.to_string()],
+            ERR_ALREADYREGISTERED{client} => vec![client.to_string()],
+            ERR_PASSWDMISMATCH{client} => vec![client.to_string()],
 
             _ => vec![],
         }
     }
 
-    pub fn numeric(self) -> u16 {
+    pub fn numeric(&self) -> u16 {
         use Numeric::*;
 
         match self {
@@ -129,5 +132,14 @@ impl Numeric {
 
             _ => 0,
         }
+    }
+}
+
+impl Write for Numeric {
+    fn write(&self, buf: &mut bytes::BytesMut) {
+        buf.put_slice(self.numeric().to_string().as_bytes());
+        buf.put_slice(b" ");
+        buf.put_slice(self.params().join(" ").as_bytes());
+
     }
 }

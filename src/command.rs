@@ -1,3 +1,6 @@
+use bytes::{BufMut, BytesMut};
+use crate::message::Write;
+
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
 pub enum Command {
@@ -64,29 +67,29 @@ impl Command {
         }
     }
 
-    pub fn params(self) -> Vec<String> {
+    pub fn params(&self) -> Vec<String> {
         use Command::*;
 
         match self {
-            PING{token} => vec![token],
+            PING{token} => vec![token.to_string()],
             PONG{server, token} => {
                 if let Some(server) = server {
-                    vec![server, token]
+                    vec![server.to_string(), token.to_string()]
                 } else {
-                    vec![token]
+                    vec![token.to_string()]
                 }
             }
-            JOIN{channels, keys} => std::iter::once(channels).chain(keys).collect(),
-            PRIVMSG{targets, text} => vec![targets, text],
-            PASS{password} => vec![password],
-            NICK{nickname} => vec![nickname],
-            USER{user, mode, unused, realname} => vec![user, mode, unused, realname],
-            WHO{mask} => vec![mask],
+            JOIN{channels, keys} => std::iter::once(channels.to_string()).chain(keys.clone()).collect(),
+            PRIVMSG{targets, text} => vec![targets.to_string(), text.to_string()],
+            PASS{password} => vec![password.to_string()],
+            NICK{nickname} => vec![nickname.to_string()],
+            USER{user, mode, unused, realname} => vec![user.to_string(), mode.to_string(), unused.to_string(), realname.to_string()],
+            WHO{mask} => vec![mask.to_string()],
             _ => vec![],
         }
     }
 
-    pub fn command(self) -> String {
+    pub fn command(&self) -> String {
         use Command::*;
 
         match self {
@@ -102,4 +105,13 @@ impl Command {
         }
     }
 
+}
+
+impl Write for Command {
+    fn write(&self, buf: &mut bytes::BytesMut) {
+        buf.put_slice(self.command().as_bytes());
+        buf.put_slice(b" ");
+        buf.put_slice(self.params().join(" ").as_bytes());
+
+    }
 }
