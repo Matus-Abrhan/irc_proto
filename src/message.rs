@@ -17,7 +17,7 @@ pub enum Content {
 }
 
 pub trait Write {
-    fn write(&self, buf: &mut BytesMut) {}
+    fn write(&self, _buf: &mut BytesMut) {}
 }
 
 impl Message {

@@ -1,4 +1,4 @@
-use bytes::{BufMut, BytesMut};
+use bytes::BufMut;
 use crate::message::Write;
 
 #[allow(non_camel_case_types)]
