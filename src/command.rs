@@ -1,32 +1,5 @@
-use bytes::BufMut;
-use crate::message::Write;
+use crate::types::Command;
 
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone)]
-pub enum Command {
-    // Connection Messages
-    CAP,
-    PASS{password: String},
-    NICK{nickname: String},
-    USER{user: String, mode: String, unused: String, realname: String},
-    PING{token: String},
-    PONG{server: Option<String>, token: String},
-    OPER{name: String, password: String},
-    QUIT{reason: Option<String>},
-    ERROR{reason: String},
-
-    // Channel Operations
-    JOIN{channels: String, keys: Option<String>},
-
-    // Sending Messages
-    PRIVMSG{targets: String, text: String},
-
-    // User-Based Queries
-    WHO{mask: String},
-
-    // Custom
-    UNKNOWN{command: String, params: Vec<String>}
-}
 
 impl Command {
     pub fn new(command: &str, params: Vec<String>) -> Self {
@@ -38,7 +11,7 @@ impl Command {
             () => {
                 match params_iter.next() {
                     Some(param) => param,
-                    None => return UNKNOWN{command: command.to_string(), params: params_iter.collect()},
+                    None => return UNKNOWN,
                 }
             };
         }
@@ -50,7 +23,7 @@ impl Command {
         }
 
         match command {
-            "CAP" => CAP{},
+            "CAP" => CAP{subcommand: required!(), capabilities: optional!()},
             "PASS" => PASS{password: required!()},
             "NICK" => NICK{nickname: required!()},
             "USER" => USER{user: required!(), mode: required!(), unused: required!(), realname: required!()},
@@ -63,7 +36,24 @@ impl Command {
             "PRIVMSG" => PRIVMSG{targets: required!(), text: required!()},
             "WHO" => WHO{mask: required!()},
 
-            _ => UNKNOWN{command: command.to_string(), params: params_iter.collect()},
+            "315" => RPL_ENDOFWHO{client: required!(), mask: required!()},
+            "352" => RPL_WHOREPLY{client: required!(), channel: required!(), username: required!(), host: required!(), server: required!(), nick: required!(), flags: required!(), hopcount: required!(), realname: required!()},
+            "353" => RPL_NAMREPLY{client: required!(), symbol: required!(), channel: required!(), members: params_iter.collect()},
+            "366" => RPL_ENDOFNAMES{client: required!(), channel: required!()},
+            "372" => RPL_MOTD{client: required!(), line: required!()},
+            "375" => RPL_MOTDSTART{client: required!(), line: required!()},
+            "376" => RPL_ENDOFMOTD{client: required!()},
+
+            "412" => ERR_NOTEXTTOSEND{client: required!()},
+            "431" => ERR_NONICKNAMEGIVEN{client: required!()},
+            "432" => ERR_ERRONEUSNICKNAME{client: required!(), nick: required!()},
+            "433" => ERR_NICKNAMEINUSE{client: required!(), nick: required!()},
+            "436" => ERR_NICKCOLLISION{client: required!(), nick: required!(), user: required!(), host: required!()},
+            "461" => ERR_NEEDMOREPARAMS{client: required!(), command: required!()},
+            "462" => ERR_ALREADYREGISTERED{client: required!()},
+            "464" => ERR_PASSWDMISMATCH{client: required!()},
+
+            _ => UNKNOWN,
         }
     }
 
@@ -71,6 +61,14 @@ impl Command {
         use Command::*;
 
         match self {
+            // TODO: fix CAP subcommands
+            CAP {subcommand, capabilities} => {
+                if let Some(cap) = capabilities {
+                    vec![subcommand.to_string(), cap.to_string()]
+                } else {
+                    vec![subcommand.to_string()]
+                }
+            }
             PING{token} => vec![token.to_string()],
             PONG{server, token} => {
                 if let Some(server) = server {
@@ -85,6 +83,25 @@ impl Command {
             NICK{nickname} => vec![nickname.to_string()],
             USER{user, mode, unused, realname} => vec![user.to_string(), mode.to_string(), unused.to_string(), realname.to_string()],
             WHO{mask} => vec![mask.to_string()],
+
+            RPL_ENDOFWHO{client, mask} => vec![client.to_string(), mask.to_string()],
+            // RPL_WHOREPLY{client, channel, username, host, server, nick, flags, hopcount, realname} => vec![client, channel, username, host, server, nick, flags, hopcount, realname],
+            // RPL_NAMREPLY{client, symbol, channel, members} => vec![client, symbol, channel, members],
+            RPL_ENDOFNAMES{client, channel} => vec![client.to_string(), channel.to_string()],
+            RPL_MOTD{client, line} => vec![client.to_string(), line.to_string()],
+            RPL_MOTDSTART{client, line} => vec![client.to_string(), line.to_string()],
+            RPL_ENDOFMOTD{client} => vec![client.to_string()],
+
+            ERR_NOTEXTTOSEND{client} => vec![client.to_string()],
+            ERR_NONICKNAMEGIVEN{client} => vec![client.to_string()],
+            ERR_ERRONEUSNICKNAME{client, nick} => vec![client.to_string(), nick.to_string()],
+            ERR_NICKNAMEINUSE{client, nick} => vec![client.to_string(), nick.to_string()],
+            ERR_NICKCOLLISION{client, nick, user, host} => vec![client.to_string(), nick.to_string(), user.to_string(), host.to_string()],
+            ERR_NEEDMOREPARAMS{client, command} => vec![client.to_string(), command.to_string()],
+            ERR_ALREADYREGISTERED{client} => vec![client.to_string()],
+            ERR_PASSWDMISMATCH{client} => vec![client.to_string()],
+
+
             _ => vec![],
         }
     }
@@ -93,6 +110,7 @@ impl Command {
         use Command::*;
 
         match self {
+            CAP {..} => "CAP".to_string(),
             PING{..} => "PING".to_string(),
             PONG{..} => "PONG".to_string(),
             JOIN{..} => "JOIN".to_string(),
@@ -101,17 +119,33 @@ impl Command {
             NICK{..} => "NICK".to_string(),
             USER{..} => "USER".to_string(),
             WHO{..} => "WHO".to_string(),
+
             _ => "".to_string(),
         }
     }
 
-}
+    pub fn numeric(&self) -> u16 {
+        use Command::*;
+        match self {
+            RPL_ENDOFWHO{..} => 315,
+            RPL_WHOREPLY{..} => 352,
+            RPL_NAMREPLY{..} => 353,
+            RPL_ENDOFNAMES{..} => 366,
+            RPL_MOTD{..} => 372,
+            RPL_MOTDSTART{..} => 375,
+            RPL_ENDOFMOTD{..} => 376,
 
-impl Write for Command {
-    fn write(&self, buf: &mut bytes::BytesMut) {
-        buf.put_slice(self.command().as_bytes());
-        buf.put_slice(b" ");
-        buf.put_slice(self.params().join(" ").as_bytes());
+            ERR_NOTEXTTOSEND{..} => 412,
+            ERR_NONICKNAMEGIVEN{..} => 431,
+            ERR_ERRONEUSNICKNAME{..} => 432,
+            ERR_NICKNAMEINUSE{..} => 433,
+            ERR_NICKCOLLISION{..} => 436,
+            ERR_NEEDMOREPARAMS{..} => 461,
+            ERR_ALREADYREGISTERED{..} => 462,
+            ERR_PASSWDMISMATCH{..} => 464,
 
+            _ => 0,
+        }
     }
+
 }
