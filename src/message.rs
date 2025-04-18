@@ -52,6 +52,7 @@ impl Message {
             }
             output.push_str(&argument);
         }
+        output.push_str("\r\n");
 
         return output
     }
@@ -108,7 +109,10 @@ impl Message {
             message.command = Command::new(input, Vec::new());
         }
 
-        return Some(message);
+        match message.command {
+            Command::UNKNOWN => return None,
+            _ => return Some(message),
+        };
     }
 
     fn parse_tags(input: &str) -> Result<Vec<Tag>, ()> {
@@ -185,13 +189,13 @@ mod tests {
     #[test]
     fn test1() {
         let message: Message = Message::from_bytes("@id=234AB :dan!d@localhost PRIVMSG #chan :Hey what's up!".as_bytes()).unwrap();
-        assert_eq!("@id=234AB :dan!d@localhost PRIVMSG #chan :Hey what's up!", message.to_bytes());
+        assert_eq!("@id=234AB :dan!d@localhost PRIVMSG #chan :Hey what's up!\r\n", message.to_bytes());
     }
 
     #[test]
     fn test2() {
         let message: Message = Message::from_bytes(":irc.example.com CAP REQ :multi-prefix extended-join sasl".as_bytes()).unwrap();
-        assert_eq!(":irc.example.com CAP REQ :multi-prefix extended-join sasl", message.to_bytes());
+        assert_eq!(":irc.example.com CAP REQ :multi-prefix extended-join sasl\r\n", message.to_bytes());
     }
 
 }
