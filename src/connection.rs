@@ -110,13 +110,18 @@ impl Connection {
             let end = src.get_ref().len();
 
             for i in start..end-1 {
-                if src.get_ref()[i] == b'\r' && src.get_ref()[i+1] == b'\n' {
+                // if src.get_ref()[i] == b'\r' && src.get_ref()[i+1] == b'\n' {
+                if src.get_ref()[i] == b'\r' || src.get_ref()[i] == b'\n' {
+                    let mut sep_len = 1;
+                    if src.get_ref()[i+1] == b'\r' || src.get_ref()[i+1] == b'\n' {
+                        sep_len += 1;
+                    }
                     if i-start > 512 {
                         // TODO: off by one error ???
-                        src.set_position((i+2)as u64);
+                        src.set_position((i+sep_len)as u64);
                         return None;
                     }
-                    src.set_position((i+2)as u64);
+                    src.set_position((i+sep_len)as u64);
                     return Some(&src.get_ref()[start..i]);
                 }
             }

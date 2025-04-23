@@ -1,25 +1,25 @@
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Message {
     pub tags: Option<Vec<Tag>>,
     pub source: Option<Source>,
     pub command: Command,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tag {
     pub key: TagKey,
     pub value: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TagKey {
     pub client_prefix: Option<String>,
     pub vendor: Option<String>,
     pub value: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Source {
     pub name: String,
     pub user: Option<String>,
@@ -38,14 +38,14 @@ pub struct ClientSource {
     pub host: Option<String>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Nickname {
     pub value: String,
     pub optional_value: Option<String>
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Command {
     // Connection Messages
     CAP{subcommand: String, capabilities: Option<String>},
